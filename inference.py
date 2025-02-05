@@ -9,8 +9,7 @@ import os
 from dotenv import load_dotenv
 
 def move_inputs_to_device(model_inputs: dict, device: str):
-    model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
-    return model_inputs
+    return {k: v.to(device) for k, v in model_inputs.items()}
 
 def get_model_inputs(
     processor: PaliGemmaProcessor, prompt: str, image_file_path: str, device: str
@@ -32,68 +31,19 @@ def test_inference(
     temperature: float,
     top_p: float,
     do_sample: bool,
+    n_predict: int
 ):
-    model_inputs = get_model_inputs(processor, prompt, image_file_path, device)
-    input_ids = model_inputs["input_ids"]
-    attention_mask = model_inputs["attention_mask"]
-    pixel_values = model_inputs["pixel_values"]
-
-    kv_cache = KVCache()
-
-    # Generate tokens until you see the stop token
-    stop_token = processor.tokenizer.eos_token_id
-    generated_tokens = []
-
-    for _ in range(max_tokens_to_generate):
-        # Get the model outputs
-        outputs = model(
-            input_ids=input_ids,
-            pixel_values=pixel_values,
-            attention_mask=attention_mask,
-        )
-        next_token_logits = outputs.logits[:, -1, :]
-        # Sample the next token
-        if do_sample:
-            # Apply temperature
-            next_token_logits = torch.softmax(next_token_logits / temperature, dim=-1)
-            next_token = _sample_top_p(next_token_logits, top_p)
-        else:
-            next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
-        assert next_token.size() == (1, 1)
-        next_token = next_token.squeeze(0)  # Remove batch dimension
-        generated_tokens.append(next_token)
-        # Stop if the stop token has been generated
-        if next_token.item() == stop_token:
-            break
-        # Append the next token to the input
-        input_ids = torch.cat([input_ids, next_token.unsqueeze(-1)], dim=-1)
-        attention_mask = torch.cat(
-            [attention_mask, torch.ones((1, 1), device=input_ids.device)], dim=-1
-        )
-
-    generated_tokens = torch.cat(generated_tokens, dim=-1)
-    # Decode the generated tokens
-    decoded = processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
-
-    print(prompt + ":", decoded)
-
-def _sample_top_p(probs: torch.Tensor, p: float):
-    # (B, vocab_size)
-    probs_sort, probs_idx = torch.sort(probs, dim=-1, descending=True)
-    # (B, vocab_size)
-    probs_sum = torch.cumsum(probs_sort, dim=-1)
-    # (B, vocab_size)
-    # (Subtracting "probs_sort" shifts the cumulative sum by 1 position to the right before masking)
-    mask = probs_sum - probs_sort > p
-    # Zero out all the probabilities of tokens that are not selected by the Top P
-    probs_sort[mask] = 0.0
-    # Redistribute the probabilities so that they sum up to 1.
-    probs_sort.div_(probs_sort.sum(dim=-1, keepdim=True))
-    # Sample a token (its index) from the top p distribution
-    next_token = torch.multinomial(probs_sort, num_samples=1)
-    # Get the token position in the vocabulary corresponding to the sampled index
-    next_token = torch.gather(probs_idx, -1, next_token)
-    return next_token
+    # For testing, we use our optimized inference wrapper.
+    inference_wrapper = OptimizedInference(model, processor, device)
+    generated_text = inference_wrapper.generate(
+        image_path=image_file_path,
+        prompt=prompt,
+        max_length=max_tokens_to_generate,
+        temperature=temperature,
+        top_p=top_p,
+        n_predict=n_predict
+    )
+    print(f"Generated text: {generated_text}")
 
 def main(
     prompt: str = None,
@@ -103,47 +53,28 @@ def main(
     top_p: float = 0.9,
     do_sample: bool = True,
     only_cpu: bool = False,
+    n_predict: int = 4  # number of tokens to predict in parallel
 ):
-    """Main inference function"""
-    
-    # Load environment variables
+    """Main inference function with accelerated decoding."""
     load_dotenv()
-    
-    # Get token from environment variable
     hf_token = os.getenv("HUGGING_FACE_TOKEN")
     if not hf_token:
         raise ValueError(
             "Please set your Hugging Face token in the .env file or environment variables.\n"
             "You can get your token from https://huggingface.co/settings/tokens"
         )
-        
-    # Set Hugging Face token
     os.environ["HUGGING_FACE_HUB_TOKEN"] = hf_token
-    
-    # Determine device
     device = "cpu" if only_cpu else ("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Load model and processor
     processor = AutoProcessor.from_pretrained("google/paligemma-3b-pt-224")
     model = AutoModelForPreTraining.from_pretrained(
         "google/paligemma-3b-pt-224",
         torch_dtype=torch.float16 if device == "mps" else "auto"
     )
     
-    # Initialize optimized inference
-    inference_wrapper = OptimizedInference(model, processor, device)
-    
-    # Generate text
-    generated_text = inference_wrapper.generate(
-        image_file_path,
-        prompt,
-        max_length=max_tokens_to_generate,
-        temperature=temperature,
-        top_p=top_p
-    )
-    
-    print(f"Generated text: {generated_text}")
+    # Test the accelerated decoding
+    test_inference(model, processor, device, prompt, image_file_path, max_tokens_to_generate, temperature, top_p, do_sample, n_predict)
 
 if __name__ == "__main__":
     fire.Fire(main)
