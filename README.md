@@ -125,4 +125,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [Umar Jamil's VLM Tutorial](https://www.youtube.com/watch?v=vAmKB7iPkWw)
 - [PaLiGemma Model Documentation](https://huggingface.co/docs/transformers/main/en/model_doc/paligemma)
 - [PyTorch](https://pytorch.org/)
-```
