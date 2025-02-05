@@ -7,7 +7,7 @@ Replication and efficient inference for the PaliGemma model—a state-of-the-art
 - **Automatic Device Selection:**  
   Automatically selects the best available device (MPS for Apple Silicon or CPU) with fallback mechanisms.
 
-- **Advanced Device-Specific Optimizations:**  
+- **Device-Specific Optimizations:**  
   - **MPS (Apple Silicon) Optimizations:**
     - Automatic mixed precision (float16) and half‑precision conversion.
     - Metal-specific memory layout optimizations.
@@ -19,7 +19,7 @@ Replication and efficient inference for the PaliGemma model—a state-of-the-art
     - Optimized memory layouts (e.g., channels_last when beneficial).
     - CPU-specific automatic mixed precision and inference mode enhancements.
 
-- **Advanced Attention Mechanisms:**  
+- **Attention Mechanisms:**  
   - **Flash Attention with Paged KV Cache:**  
     - A new `GemmaFlashPagedAttention` module leveraging PyTorch’s efficient scaled dot‑product attention (flash attention–like kernels) with support for rotary embeddings and paged KV caching.
   
@@ -115,10 +115,6 @@ This project leverages several advanced deep learning concepts and optimizations
   
 - **CPU:**  
   Optimized for CPU inference using int8 dynamic quantization and efficient memory layouts.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Acknowledgements
 
