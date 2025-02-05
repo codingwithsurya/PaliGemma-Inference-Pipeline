@@ -74,7 +74,6 @@ python inference.py --prompt "Describe this image in detail" --image_file_path d
 
 ```
 
-
 ### Parameters
 
 - `--prompt`: The text prompt for the model.
@@ -127,11 +126,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [PaLiGemma Model Documentation](https://huggingface.co/docs/transformers/main/en/model_doc/paligemma)
 - [PyTorch](https://pytorch.org/)
 ```
-
-
-
-
-
-
-
-
